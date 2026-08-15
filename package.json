@@ -14,7 +14,8 @@
     "lib",
     "README.md",
     "LICENSE",
-    "docs"
+    "docs",
+    "cordis.patch.yml"
   ],
   "scripts": {
     "test": "node test/plugin.test.mjs && node test/client.test.mjs"
@@ -37,6 +38,9 @@
     "schemastery": "3.18.0"
   },
   "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
     "client": {
       "platform": "web",
       "inject": [

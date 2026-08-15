@@ -34,47 +34,14 @@ Claude 式「区域风控 + 自主结束对话」插件 —— 适用于 DeepSee
 
 *未成年性内容 / 恐怖主义 / 大规模暴力等严重有害内容不警告、直接以独立文案结束对话；自伤 / 他伤风险消息则永不触发结束。*
 
-## 安装
-
-### 方式一：dsh plugin（pnpm 从 GitHub 安装）
+## 安装（一条命令）
 
 ```bash
-# 在 dsh 安装后执行
-dsh plugin --profile web add github:eri64/dsh-claude-ux
+npx -y @deepseek-ai/dsh plugin --profile web add github:eri64/dsh-claude-ux
 ```
 
-然后把以下 insert 追加到 `~/.dsh/profiles/web/cordis.patch.yml`：
-
-```yaml
-- insert:
-    - id: claude
-      name: dsh-claude-ux
-      config:
-        enabled: false
-        region:
-          target: cn
-          policy: block
-          minSignals: 2
-          refusalEndsAfter: 3
-          ipCheck: false
-          webRtcCheck: false
-        abuse:
-          enabled: true
-          warnThreshold: 1
-          endThreshold: 3
-          warnEveryOffense: true
-          severeEndsImmediately: true
-          llm:
-            enabled: true
-            mode: all
-        steganography: true
-```
-
-（完整示例见 [examples/cordis.patch.yml](examples/cordis.patch.yml)。）
-
-### 方式二：手动复制
-
-把 `lib/`、`package.json` 复制到 `~/.dsh/profiles/web/node_modules/dsh-claude-ux/`，再按方式一追加 insert。
+包内自带注册条目（`dsh.bundle`），`dsh plugin` 安装后**自动注册**，无需手动改任何配置文件。
+更新（升级到最新版）也是同一条命令。
 
 ### 启用
 
@@ -86,6 +53,12 @@ dsh plugin --profile web add github:eri64/dsh-claude-ux
 
 > 校验安装是否成功：浏览器访问本机 dsh web 的 `/_dsh/claude/status`
 > （默认 `http://127.0.0.1:3080/_dsh/claude/status`），返回 `{"ok":true,...}` 即主机插件已加载。
+
+### 自定义默认配置（可选）
+
+内置默认值开箱即用；需要覆盖 patch 级选项（`blacklist` / `cnTimezones` / 词表等）时，
+参考 [examples/cordis.patch.yml](examples/cordis.patch.yml) 修改包内
+`node_modules/dsh-claude-ux/cordis.patch.yml` 后重新安装即可（设置页可改的项优先用设置页）。
 
 ## 配置
 
