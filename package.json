@@ -1,0 +1,49 @@
+{
+  "name": "dsh-claude-web",
+  "version": "1.0.0",
+  "description": "Claude-style region risk-control (China / non-China target, reversible) + abusive-interaction auto-end for DeepSeek Harness web profile",
+  "private": false,
+  "type": "module",
+  "main": "./lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "README.md",
+    "LICENSE",
+    "docs"
+  ],
+  "scripts": {
+    "test": "node test/plugin.test.mjs && node test/client.test.mjs"
+  },
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "plugin",
+    "claude",
+    "region",
+    "risk-control",
+    "geo-block"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/<your-username>/dsh-claude-web.git"
+  },
+  "dependencies": {
+    "schemastery": "3.18.0"
+  },
+  "dsh": {
+    "client": {
+      "platform": "web",
+      "inject": [
+        "slots",
+        "sessions",
+        "workspaces"
+      ]
+    }
+  }
+}

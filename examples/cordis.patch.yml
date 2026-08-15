@@ -1,0 +1,23 @@
+# 追加到 ~/.dsh/profiles/web/cordis.patch.yml 的 insert 段
+# （dsh plugin --profile web add github:<your-username>/dsh-claude-web 之后）
+- insert:
+    - id: claude
+      name: dsh-claude-web
+      config:
+        enabled: false
+        region:
+          target: cn
+          policy: block
+          minSignals: 2
+          refusalEndsAfter: 3
+          ipCheck: false
+          webRtcCheck: false
+          ipTimeoutMs: 3000
+          blockOnUnknown: false
+        abuse:
+          enabled: true
+          warnThreshold: 1
+          endThreshold: 3
+          warnEveryOffense: true
+          severeEndsImmediately: true
+        steganography: true
