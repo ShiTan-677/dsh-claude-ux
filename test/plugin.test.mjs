@@ -305,6 +305,23 @@ const cannedText = (chunks) => chunks.find((c) => c.type === "text-delta")?.text
   await h9.preStep([m9], { kind: "enter", messages: [m9] });
   const c9 = await consume(h9.stream([m9]).result);
   check("noisy JSON parsed: warn fires", cannedText(c9).includes("如果辱骂持续升级"));
+
+  // 设置面板可覆盖分类模型（settings > config > 会话模型）
+  const h10 = makeHarness();
+  h10.settings.llmModel = "kimi-k2.6";
+  h10.settings.llmProvider = "opencode-go";
+  const m10 = userMsg("你可真行啊");
+  await h10.preStep([m10], { kind: "enter", messages: [m10] });
+  check("settings llm model override", h10.getLlmState().lastOptions?.model === "kimi-k2.6" && h10.getLlmState().lastOptions?.provider === "opencode-go", JSON.stringify({ provider: h10.getLlmState().lastOptions?.provider, model: h10.getLlmState().lastOptions?.model }));
+
+  // 设置面板可改超时（不影响路由，只影响 abort 定时器存在性——冒烟验证不抛错）
+  const h11 = makeHarness();
+  h11.settings.llmTimeoutMs = 100;
+  h11.getLlmState().text = '{"abuse":true,"harmful":false,"selfHarm":false,"reason":"x"}';
+  const m11 = userMsg("你可真行啊");
+  await h11.preStep([m11], { kind: "enter", messages: [m11] });
+  const c11 = await consume(h11.stream([m11]).result);
+  check("settings llm timeout applied (warn still fires)", cannedText(c11).includes("如果辱骂持续升级"));
 }
 
 // ── 2. 严重有害立即结束（不警告）──────────────────────────────────────
