@@ -1,5 +1,5 @@
 # 追加到 ~/.dsh/profiles/web/cordis.patch.yml 的 insert 段
-# （dsh plugin --profile web add github:<your-username>/dsh-claude-web 之后）
+# （dsh plugin --profile web add github:eri64/dsh-claude-web 之后）
 - insert:
     - id: claude
       name: dsh-claude-web

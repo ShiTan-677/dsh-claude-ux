@@ -50,7 +50,7 @@ Claude 式「区域风控 + 自主结束对话」插件 —— 适用于 DeepSee
 
 ```bash
 # 在 dsh 安装后执行
-dsh plugin --profile web add github:<your-username>/dsh-claude-web
+dsh plugin --profile web add github:eri64/dsh-claude-web
 ```
 
 然后把以下 insert 追加到 `~/.dsh/profiles/web/cordis.patch.yml`：

@@ -31,7 +31,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/<your-username>/dsh-claude-web.git"
+    "url": "git+https://github.com/eri64/dsh-claude-web.git"
   },
   "dependencies": {
     "schemastery": "3.18.0"
