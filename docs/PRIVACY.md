@@ -62,13 +62,13 @@
 ### 8. 供应链
 - 唯一运行时依赖 `schemastery@3.18.0`（npm，固定版本）。发布时建议保留锁文件。
 
-## 发布前检查清单（防个人信息泄露）
+## 发布前核查（已完成）
 
 - [x] `lib/` 内无绝对路径 / 用户名 / 机器名
-- [x] 仓库不含 `~/.dsh/settings.yaml`、profile 的 `cordis.patch.yml`（其中含 GEMINI_API_KEY 等 **credential 引用**）、`.credentials.yaml`、会话数据
-- [x] 测试脚本改为相对导入（`../lib/*`），不引用本机路径
-- [ ] 发布前把 `package.json` 的 `repository.url` 占位符替换为真实仓库地址
-- [ ] 若 GitHub 账号名与邮箱有隐私顾虑：使用独立发布邮箱 / `noreply` 邮箱配置 git，并在 LICENSE 中保留"contributors"署名而非个人名
+- [x] 仓库不含 `~/.dsh/settings.yaml`、profile 的 `cordis.patch.yml`（其中含 credential 引用）、`.credentials.yaml`、会话数据
+- [x] 测试脚本相对导入（`../lib/*`），不引用本机路径
+- [x] `package.json` 的 `repository.url` 为真实仓库地址
+- [x] 提交使用 `users.noreply.github.com` 邮箱，LICENSE 保留「contributors」署名
 
 ## 变更记录
 

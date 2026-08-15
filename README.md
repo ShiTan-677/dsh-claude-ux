@@ -84,8 +84,8 @@ dsh plugin --profile web add github:eri64/dsh-claude-ux
    （`/_dsh/claude/status`）、阈值与文案。
 3. **默认关闭**（`enabled: false`，避免把自己锁在外面）；打开总开关并「保存并应用」后即时生效。
 
-> 校验安装是否成功：浏览器访问 `http://127.0.0.1:3080/_dsh/claude/status`，返回
-> `{"ok":true,...}` 即主机插件已加载。
+> 校验安装是否成功：浏览器访问本机 dsh web 的 `/_dsh/claude/status`
+> （默认 `http://127.0.0.1:3080/_dsh/claude/status`），返回 `{"ok":true,...}` 即主机插件已加载。
 
 ## 配置
 
@@ -119,7 +119,7 @@ dsh plugin --profile web add github:eri64/dsh-claude-ux
 ## 开发
 
 ```bash
-npm test   # 运行主机（100 项）与客户端（17 项）单元测试，无需 dsh 实例
+npm test   # 运行主机（115 项）与客户端（17 项）单元测试，无需 dsh 实例
 ```
 
 测试覆盖：分类器（词表分级 + LLM 语境裁决/消歧/失败降级/异步预分类）、区域判定（含反向目标）、
