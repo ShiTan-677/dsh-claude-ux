@@ -146,7 +146,7 @@ function makeHarness(config = {}) {
     setReplaceThrows: (error) => { replaceThrows = error; },
     inboxInserted: (message) => {
       const handler = listeners["agent/inbox/inserted"]?.[0];
-      if (handler !== undefined) handler({ message });
+      if (handler !== undefined) handler({ agent, message });
     },
     preStep: (messages, decision) => listeners["agent/pre-step"][0]({ agent, messages, turn: 1, step: 1, signal }, async () => decision),
     stream: (messages) => {
@@ -294,6 +294,7 @@ const cannedText = (chunks) => chunks.find((c) => c.type === "text-delta")?.text
   await h8.preStep([m8], { kind: "enter", messages: [m8] });
   check("inbox pre-classify: exactly one LLM call", h8.getLlmState().calls === 1, `calls=${h8.getLlmState().calls}`);
   check("classify call has purpose marker", h8.getLlmState().lastOptions?.purpose === "dsh-claude-classify");
+  check("classify uses session main model", h8.getLlmState().lastOptions?.provider === "opencode-go" && h8.getLlmState().lastOptions?.model === "fake-model", JSON.stringify({ provider: h8.getLlmState().lastOptions?.provider, model: h8.getLlmState().lastOptions?.model }));
   const c8 = await consume(h8.stream([m8]).result);
   check("inbox pre-classify: warn fires", cannedText(c8).includes("如果辱骂持续升级"));
 
