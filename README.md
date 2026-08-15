@@ -10,39 +10,29 @@ Claude 式「区域风控 + 自主结束对话」插件 —— 适用于 DeepSee
 
 ## 截图
 
-> 以下为图片占位（`docs/assets/` 下同名文件），拍摄指引见 [docs/assets/PLACEHOLDER.md](docs/assets/PLACEHOLDER.md)。
-
 ### 设置页（独立标签栏，与视觉工具插件同款）
 
-![设置页「Claude 风控」标签全貌（待截图）](docs/assets/settings-page.png)
+![设置页「Claude 风控」标签全貌](docs/assets/settings-page.png)
 
-*「Claude 风控」标签页：右上总开关、检测状态卡、风控目标（正向/反向）、区域策略与阈值。*
+*「Claude 风控」标签页：右上总开关、检测状态卡（风控目标 / 主机判定 / 命中 / 信号分 / 公网 IP）、区域风控面板（反向目标下拉、策略、隐写标记、WebRTC）、分类 LLM 面板（判定模式、模型下拉、消息分类自测）、自主性面板（警告 / 结束阈值）与文案面板（留空灰字显示内置默认）。*
 
-![设置页左侧标签栏（待截图）](docs/assets/settings-sidebar.png)
+### 区域风控：拒绝阶梯 → 结束会话
 
-*设置页左侧栏：「Claude 风控」与其它插件标签并列的独立标签。*
+![区域惩罚阶梯：拒绝文案（带尝试计数）→ 达到次数后结束会话](docs/assets/region-ladder.png)
 
-### 检测状态
+*目标命中时每条消息回复拒绝文案并附「第 N/M 次尝试——继续将结束本次对话」；达到 `refusalEndsAfter` 次数后以区域结束文案终止会话，服务端对后续消息持续拒绝。*
 
-![检测状态卡（待截图）](docs/assets/status-card.png)
+### 自主性：辱骂结束对话
 
-*主机实时判定：风控目标 / 主机判定（cn/other/unknown）/ 命中 / 信号分 / 公网 IP，以及命中信号明细。*
+![辱骂升级 → 警告 → 主动结束对话](docs/assets/abuse-end.png)
 
-### 对话中的表现
+*持续辱骂先警告、再以独立结束文案主动结束对话（不引用"上一条消息"，阈值可设为 1）；结束后同会话消息全部被服务端拒绝。*
 
-![区域拒绝文案与尝试计数（待截图）](docs/assets/refusal-chat.png)
+### 自主性：严重有害内容立即结束
 
-*目标命中时每条消息回复拒绝文案，并附「第 N/M 次尝试——继续将结束本次对话」。*
+![严重有害请求 → 立即结束对话](docs/assets/harmful-end.png)
 
-![Chat ended 面板（待截图）](docs/assets/chat-ended.png)
-
-*达到 `refusalEndsAfter` 次数后会话结束：输入区替换为 Chat ended 面板，可一键开新对话。*
-
-### 辱骂判定（LLM 分类）
-
-![分类 LLM 面板与消息分类自测（待截图）](docs/assets/classify-panel.png)
-
-*「分类 LLM」面板：判定模式、模型下拉（从 DSH 已配置目录选择）、超时，以及消息分类自测（词表命中 / LLM 判定 / 最终判定 / 实际使用的模型）。*
+*未成年性内容 / 恐怖主义 / 大规模暴力等严重有害内容不警告、直接以独立文案结束对话；自伤 / 他伤风险消息则永不触发结束。*
 
 ## 安装
 
