@@ -88,6 +88,21 @@ function makeHarness(config = {}) {
           describe: () => [
             { ns: "claude", value: settingsValue, revision, base: {}, user: null },
             { ns: "agent-default-model", value: { provider: "opencode-go", model: "fake-model" }, revision: 0, base: {}, user: null },
+            {
+              ns: "llm-pi-ai",
+              value: {
+                providers: {
+                  "opencode-go": {
+                    apiKeyEnv: "OPENCODE_GO_API_KEY",
+                    models: [
+                      { id: "deepseek-v4-flash", name: "DeepSeek V4 Flash", contextWindow: 1000000, maxTokens: 384000 },
+                      { id: "kimi-k2.6", name: "Kimi K2.6", contextWindow: 262144, maxTokens: 65536 },
+                    ],
+                  },
+                },
+              },
+              revision: 0, base: {}, user: null,
+            },
           ],
           replace: (ns, value, expectedRevision) => {
             if (replaceThrows !== null) throw replaceThrows;
@@ -633,6 +648,7 @@ const cannedText = (chunks) => chunks.find((c) => c.type === "text-delta")?.text
   check("route verdict: CN + blocked", body.value.verdict.region === "cn" && body.value.verdict.blocked === true, JSON.stringify(body.value.verdict));
   check("route settings: full value + revision", typeof body.value.settings.value === "object" && body.value.settings.value.regionTarget === "cn" && Number.isInteger(body.value.settings.revision), JSON.stringify(body.value.settings).slice(0, 120));
   check("route settings: endPrefixes present", Array.isArray(body.value.settings.endPrefixes) && body.value.settings.endPrefixes.length > 0 && Array.isArray(body.value.settings.regionEndPrefixes) && body.value.settings.regionEndPrefixes.length > 0, JSON.stringify(body.value.settings.endPrefixes));
+  check("route catalog: DSH configured models listed", Array.isArray(body.value.settings.catalog) && body.value.settings.catalog.length >= 2 && body.value.settings.catalog.some((m) => m.provider === "opencode-go" && m.model === "kimi-k2.6"), JSON.stringify(body.value.settings.catalog).slice(0, 160));
   check("route settings: writable flag", body.value.settings.writable === true);
   check("route carries signals", Array.isArray(body.value.verdict.signals) && body.value.verdict.signals.some((s) => s.name === "browser_zh_lang"));
 
@@ -690,6 +706,7 @@ const cannedText = (chunks) => chunks.find((c) => c.type === "text-delta")?.text
   const clsBody = JSON.parse(resCls.out.body);
   check("classify action: keyword hit + merged true", clsBody.ok === true && clsBody.value.keyword.classification.abuse === true && clsBody.value.keyword.matched.abuse.length > 0 && clsBody.value.merged.abuse === true, resCls.out.body);
   check("classify action: llm consulted", clsBody.value.llm !== null && typeof clsBody.value.llm.abuse === "boolean", JSON.stringify(clsBody.value.llm));
+  check("classify action: used model reported", clsBody.value.used !== null && clsBody.value.used.provider === "opencode-go" && clsBody.value.used.model === "fake-model", JSON.stringify(clsBody.value.used));
   // LLM 判否 → 弱词消歧
   h.getLlmState().text = '{"abuse":false,"harmful":false,"selfHarm":false,"reason":"垃圾分类，中性"}';
   const resCls2 = fakeRes();
