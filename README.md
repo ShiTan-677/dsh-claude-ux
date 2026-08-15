@@ -1,4 +1,4 @@
-# dsh-claude-web
+# dsh-claude-ux
 
 Claude 式「区域风控 + 自主结束对话」插件 —— 适用于 DeepSeek Harness 的 web profile。
 
@@ -50,7 +50,7 @@ Claude 式「区域风控 + 自主结束对话」插件 —— 适用于 DeepSee
 
 ```bash
 # 在 dsh 安装后执行
-dsh plugin --profile web add github:eri64/dsh-claude-web
+dsh plugin --profile web add github:eri64/dsh-claude-ux
 ```
 
 然后把以下 insert 追加到 `~/.dsh/profiles/web/cordis.patch.yml`：
@@ -58,7 +58,7 @@ dsh plugin --profile web add github:eri64/dsh-claude-web
 ```yaml
 - insert:
     - id: claude
-      name: dsh-claude-web
+      name: dsh-claude-ux
       config:
         enabled: false
         region:
@@ -84,7 +84,7 @@ dsh plugin --profile web add github:eri64/dsh-claude-web
 
 ### 方式二：手动复制
 
-把 `lib/`、`package.json` 复制到 `~/.dsh/profiles/web/node_modules/dsh-claude-web/`，再按方式一追加 insert。
+把 `lib/`、`package.json` 复制到 `~/.dsh/profiles/web/node_modules/dsh-claude-ux/`，再按方式一追加 insert。
 
 ### 启用
 

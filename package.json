@@ -1,5 +1,5 @@
 {
-  "name": "dsh-claude-web",
+  "name": "dsh-claude-ux",
   "version": "1.0.0",
   "description": "Claude-style region risk-control (China / non-China target, reversible) + abusive-interaction auto-end for DeepSeek Harness web profile",
   "private": false,
@@ -31,7 +31,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/eri64/dsh-claude-web.git"
+    "url": "git+https://github.com/eri64/dsh-claude-ux.git"
   },
   "dependencies": {
     "schemastery": "3.18.0"

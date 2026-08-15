@@ -1,4 +1,4 @@
-# 隐私与信息暴露审查（dsh-claude-web v1.0.0）
+# 隐私与信息暴露审查（dsh-claude-ux v1.0.0）
 
 > 审查日期：2026-08-15。审查对象：`lib/index.js`（主机）、`lib/client.js`（浏览器）。
 
