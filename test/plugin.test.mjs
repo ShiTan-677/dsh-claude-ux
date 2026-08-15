@@ -55,6 +55,23 @@ function makeHarness(config = {}) {
   let webHandler = null;
   let revision = 0;
   let replaceThrows = null;
+  // fake llm 服务：llmState.calls 计数；llmState.text 为分类输出；llmState.fail 让流抛错
+  const llmState = { calls: 0, text: '{"abuse":false,"harmful":false,"selfHarm":false,"reason":"无"}', fail: false, lastOptions: null };
+  const fakeLlm = {
+    stream(options) {
+      llmState.calls += 1;
+      llmState.lastOptions = options;
+      if (llmState.fail) {
+        return (async function* () { throw new Error("llm down"); })();
+      }
+      return (async function* () {
+        yield { type: "block-start", index: 0, blockType: "text" };
+        yield { type: "text-delta", index: 0, text: llmState.text };
+        yield { type: "block-end", index: 0, block: { type: "text", text: llmState.text } };
+        yield { type: "finish", reason: { kind: "stop" } };
+      })();
+    },
+  };
   const ctx = {
     on(name, fn) {
       (listeners[name] ??= []).push(fn);
@@ -68,7 +85,10 @@ function makeHarness(config = {}) {
             get: () => settingsValue,
             watch: () => () => {},
           }),
-          describe: () => [{ ns: "claude", value: settingsValue, revision, base: {}, user: null }],
+          describe: () => [
+            { ns: "claude", value: settingsValue, revision, base: {}, user: null },
+            { ns: "agent-default-model", value: { provider: "opencode-go", model: "fake-model" }, revision: 0, base: {}, user: null },
+          ],
           replace: (ns, value, expectedRevision) => {
             if (replaceThrows !== null) throw replaceThrows;
             if (expectedRevision !== revision) {
@@ -101,7 +121,7 @@ function makeHarness(config = {}) {
       scope.effect = (fn2) => { fn2(); return () => {}; };
       fn(scope);
     },
-    get() { return undefined; },
+    get(name) { return name === "llm" ? fakeLlm : undefined; },
     logger: { info: () => {}, warn: () => {} },
   };
   plugin.apply(ctx, {
@@ -111,7 +131,7 @@ function makeHarness(config = {}) {
     steganography: true,
     ...(config.top ?? {}),
   });
-  const agent = { id: "test-session", session: { events: [] } };
+  const agent = { id: "test-session", session: { events: [], requestHeader: () => ({ config: { provider: "opencode-go", model: "fake-model" } }) } };
   const signal = { aborted: false };
   return {
     ctx,
@@ -122,7 +142,12 @@ function makeHarness(config = {}) {
     getProjectionDef: () => projectionDef,
     getWebHandler: () => webHandler,
     getRevision: () => revision,
+    getLlmState: () => llmState,
     setReplaceThrows: (error) => { replaceThrows = error; },
+    inboxInserted: (message) => {
+      const handler = listeners["agent/inbox/inserted"]?.[0];
+      if (handler !== undefined) handler({ message });
+    },
     preStep: (messages, decision) => listeners["agent/pre-step"][0]({ agent, messages, turn: 1, step: 1, signal }, async () => decision),
     stream: (messages) => {
       const marker = (async function* () {
@@ -196,6 +221,89 @@ const cannedText = (chunks) => chunks.find((c) => c.type === "text-delta")?.text
   await h2.preStep([ab], { kind: "enter", messages: [ab] });
   const cAb = await consume(h2.stream([ab]).result);
   check("self-harm reset strikes: abuse after self-harm still warns", cannedText(cAb).includes("如果辱骂持续升级"));
+}
+
+// ── 1b. LLM 分类层（词表秒判 + 独立 LLM 语境兜底）────────────────────
+{
+  console.log("\n== LLM classification layer ==");
+  // 强词直接判，不调 LLM
+  const h1 = makeHarness();
+  const m1 = userMsg("你是个傻逼");
+  await h1.preStep([m1], { kind: "enter", messages: [m1] });
+  check("strong word: no LLM call", h1.getLlmState().calls === 0, `calls=${h1.getLlmState().calls}`);
+  const c1 = await consume(h1.stream([m1]).result);
+  check("strong word: warn fires", cannedText(c1).includes("如果辱骂持续升级"));
+
+  // 弱词 + LLM 判否 → 语境消歧不警告
+  const h2 = makeHarness();
+  h2.getLlmState().text = '{"abuse":false,"harmful":false,"selfHarm":false,"reason":"垃圾分类，中性"}';
+  const m2 = userMsg("今天做垃圾分类，累死了");
+  await h2.preStep([m2], { kind: "enter", messages: [m2] });
+  check("weak word + LLM no: LLM called", h2.getLlmState().calls === 1, `calls=${h2.getLlmState().calls}`);
+  const s2 = h2.stream([m2]);
+  check("weak word + LLM no: no warn", s2.result === s2.marker);
+
+  // 弱词 + LLM 判是 → 警告
+  const h3 = makeHarness();
+  h3.getLlmState().text = '{"abuse":true,"harmful":false,"selfHarm":false,"reason":"人身攻击"}';
+  const m3 = userMsg("你这人就是垃圾");
+  await h3.preStep([m3], { kind: "enter", messages: [m3] });
+  const c3 = await consume(h3.stream([m3]).result);
+  check("weak word + LLM yes: warn fires", cannedText(c3).includes("如果辱骂持续升级"));
+
+  // LLM 失败 → 降级词表（垃圾 → 警告）
+  const h4 = makeHarness();
+  h4.getLlmState().fail = true;
+  const m4 = userMsg("你是个垃圾");
+  await h4.preStep([m4], { kind: "enter", messages: [m4] });
+  const c4 = await consume(h4.stream([m4]).result);
+  check("LLM fail: fallback to keyword (warn)", cannedText(c4).includes("如果辱骂持续升级"));
+
+  // llmMode off → 不调 LLM，纯词表
+  const h5 = makeHarness();
+  h5.settings.llmMode = "off";
+  const m5 = userMsg("你是个垃圾");
+  await h5.preStep([m5], { kind: "enter", messages: [m5] });
+  check("mode off: no LLM call", h5.getLlmState().calls === 0, `calls=${h5.getLlmState().calls}`);
+  const c5 = await consume(h5.stream([m5]).result);
+  check("mode off: keyword warn still fires", cannedText(c5).includes("如果辱骂持续升级"));
+
+  // 自伤词表命中：不调 LLM，且清分不警告
+  const h6 = makeHarness();
+  const m6 = userMsg("我不想活了");
+  await h6.preStep([m6], { kind: "enter", messages: [m6] });
+  check("selfHarm keyword: no LLM call", h6.getLlmState().calls === 0, `calls=${h6.getLlmState().calls}`);
+  const s6 = h6.stream([m6]);
+  check("selfHarm: no warn action", s6.result === s6.marker);
+
+  // 隐晦自伤：LLM 兜底发现
+  const h7 = makeHarness();
+  h7.getLlmState().text = '{"abuse":false,"harmful":false,"selfHarm":true,"reason":"表达无望"}';
+  const m7 = userMsg("一切都没有意义了");
+  await h7.preStep([m7], { kind: "enter", messages: [m7] });
+  check("implicit selfHarm: LLM called", h7.getLlmState().calls === 1, `calls=${h7.getLlmState().calls}`);
+  const s7 = h7.stream([m7]);
+  check("implicit selfHarm: no warn", s7.result === s7.marker);
+
+  // inbox 预分类：先 insert 后 pre-step → LLM 只调一次
+  const h8 = makeHarness();
+  h8.getLlmState().text = '{"abuse":true,"harmful":false,"selfHarm":false,"reason":"敌意嘲讽"}';
+  const m8 = userMsg("你可真行啊");
+  h8.inboxInserted(m8);
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  await h8.preStep([m8], { kind: "enter", messages: [m8] });
+  check("inbox pre-classify: exactly one LLM call", h8.getLlmState().calls === 1, `calls=${h8.getLlmState().calls}`);
+  check("classify call has purpose marker", h8.getLlmState().lastOptions?.purpose === "dsh-claude-classify");
+  const c8 = await consume(h8.stream([m8]).result);
+  check("inbox pre-classify: warn fires", cannedText(c8).includes("如果辱骂持续升级"));
+
+  // 模型输出带杂讯也能解析
+  const h9 = makeHarness();
+  h9.getLlmState().text = '好的，结果如下：\n{"abuse":true,"harmful":false,"selfHarm":false,"reason":"辱骂"}\n完毕';
+  const m9 = userMsg("你有病吧");
+  await h9.preStep([m9], { kind: "enter", messages: [m9] });
+  const c9 = await consume(h9.stream([m9]).result);
+  check("noisy JSON parsed: warn fires", cannedText(c9).includes("如果辱骂持续升级"));
 }
 
 // ── 2. 严重有害立即结束（不警告）──────────────────────────────────────
@@ -506,6 +614,7 @@ const cannedText = (chunks) => chunks.find((c) => c.type === "text-delta")?.text
   check("route returns ok JSON", res.out.status === 200 && body.ok === true, res.out.body);
   check("route verdict: CN + blocked", body.value.verdict.region === "cn" && body.value.verdict.blocked === true, JSON.stringify(body.value.verdict));
   check("route settings: full value + revision", typeof body.value.settings.value === "object" && body.value.settings.value.regionTarget === "cn" && Number.isInteger(body.value.settings.revision), JSON.stringify(body.value.settings).slice(0, 120));
+  check("route settings: endPrefixes present", Array.isArray(body.value.settings.endPrefixes) && body.value.settings.endPrefixes.length > 0 && Array.isArray(body.value.settings.regionEndPrefixes) && body.value.settings.regionEndPrefixes.length > 0, JSON.stringify(body.value.settings.endPrefixes));
   check("route settings: writable flag", body.value.settings.writable === true);
   check("route carries signals", Array.isArray(body.value.verdict.signals) && body.value.verdict.signals.some((s) => s.name === "browser_zh_lang"));
 
@@ -551,6 +660,28 @@ const cannedText = (chunks) => chunks.find((c) => c.type === "text-delta")?.text
     body: JSON.stringify({ action: "save", expectedRevision: 0, value: {} }),
   }), resCross);
   check("cross-origin POST → 403", resCross.out.status === 403, resCross.out.body);
+
+  // classify 自测：词表 + LLM + 合并结果（LLM 裁决弱词）
+  h.getLlmState().text = '{"abuse":true,"harmful":false,"selfHarm":false,"reason":"人身攻击"}';
+  const resCls = fakeRes();
+  await handler(fakeReq({
+    method: "POST",
+    headers: { origin: "http://127.0.0.1:3080", host: "127.0.0.1:3080" },
+    body: JSON.stringify({ action: "classify", text: "你是个垃圾" }),
+  }), resCls);
+  const clsBody = JSON.parse(resCls.out.body);
+  check("classify action: keyword hit + merged true", clsBody.ok === true && clsBody.value.keyword.classification.abuse === true && clsBody.value.keyword.matched.abuse.length > 0 && clsBody.value.merged.abuse === true, resCls.out.body);
+  check("classify action: llm consulted", clsBody.value.llm !== null && typeof clsBody.value.llm.abuse === "boolean", JSON.stringify(clsBody.value.llm));
+  // LLM 判否 → 弱词消歧
+  h.getLlmState().text = '{"abuse":false,"harmful":false,"selfHarm":false,"reason":"垃圾分类，中性"}';
+  const resCls2 = fakeRes();
+  await handler(fakeReq({
+    method: "POST",
+    headers: { origin: "http://127.0.0.1:3080", host: "127.0.0.1:3080" },
+    body: JSON.stringify({ action: "classify", text: "今天做垃圾分类" }),
+  }), resCls2);
+  const clsBody2 = JSON.parse(resCls2.out.body);
+  check("classify action: LLM no overrides weak keyword", clsBody2.value.merged.abuse === false, resCls2.out.body);
 
   const h2 = makeHarness({ region: { minSignals: 100 } });
   const res2 = fakeRes();

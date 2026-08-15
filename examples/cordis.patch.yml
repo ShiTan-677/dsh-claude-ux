@@ -20,4 +20,9 @@
           endThreshold: 3
           warnEveryOffense: true
           severeEndsImmediately: true
+          llm:
+            enabled: true
+            mode: all          # all=全部消息 LLM 语境判定 | fuzzy=仅弱词 | off=纯词表
+            # provider: opencode-go   # 可选：指定分类模型（缺省复用会话主模型）
+            # model: kimi-k2.6
         steganography: true

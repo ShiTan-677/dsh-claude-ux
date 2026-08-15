@@ -5,7 +5,7 @@ Claude 式「区域风控 + 自主结束对话」插件 —— 适用于 DeepSee
 复刻 Anthropic/Claude 的两类行为，**除两个默认关闭的可选外部调用外全部本地判定**（详见 [docs/PRIVACY.md](docs/PRIVACY.md)）：
 
 - **区域风控（可反向）**：检测目标用户（时区、系统/浏览器语言、中文字体、代理、代理/中转域名黑名单、公网 IP 归属、WebRTC IP 一致性）。`regionTarget` 选 `cn` = 风控中国用户（Claude 原版行为），选 `non-cn` = **反向风控**（检测到不是中国人就风控）。命中后按惩罚阶梯处置：拒绝文案（带尝试计数）→ 达到 `refusalEndsAfter` 次数后结束会话（Chat ended 面板 + 服务端持续拒绝，重启后依然生效）→ 系统提示词注入模型级区域指令。
-- **自主性**：用户持续辱骂或反复要求严重有害内容时，先警告、再主动结束对话；自伤/他伤风险消息永不触发结束（对齐 Claude 的公开限制）。
+- **自主性**：用户持续辱骂或反复要求严重有害内容时，先警告、再主动结束对话；自伤/他伤风险消息永不触发结束（对齐 Claude 的公开限制）。辱骂判定采用**词表秒判 + LLM 语境兜底**：强词（傻逼/fuck 等）直接判；弱词（垃圾/闭嘴等）与未命中消息由独立 LLM 请求做语境裁决（复用会话主模型，`purpose` 标记，**不进会话日志与模型上下文**；消息入队即异步预分类，近零额外延迟）。
 - **隐写通道**：系统提示词日期格式（`2026-06-30` ↔ `2026/06/30`）编码区域判定，Unicode 撇号变体（U+2019 ↔ U+02BC）编码黑名单命中。
 
 ## 截图
@@ -103,10 +103,13 @@ dsh plugin --profile web add github:<your-username>/dsh-claude-web
 | `region.webRtcCheck` | `false` | WebRTC IP 探测（联系 Google STUN，**默认关闭**） |
 | `region.blockOnUnknown` | `false` | 完全无信号时是否视为目标命中（fail-closed） |
 | `region.cnTimezones` / `region.blacklist` | 内置 | 中国时区表 / 代理中转域名黑名单（可整体替换） |
-| `abuse.*` | 内置 | 辱骂/严重有害/自伤词表（正则，可整体替换） |
+| `abuse.*` | 内置 | 辱骂/严重有害/自伤词表（正则，可整体替换）；`strongPatterns`/`weakPatterns` 分级 |
+| `abuse.llm.mode` | `all` | 辱骂判定模式：`all`=全部消息 LLM 语境判定（最准）\| `fuzzy`=仅弱词调 LLM \| `off`=纯词表 |
+| `abuse.llm.enabled` | `true` | LLM 分类总开关 |
+| `abuse.llm.provider/model` | 跟随会话 | 分类请求的模型（缺省复用会话主模型 / agent-default-model） |
 | `steganography` | `true` | 隐写标记 |
 
-设置页可改：`enabled / regionPolicy / regionTarget / abuseEnabled / warnThreshold / endThreshold / refusalEndsAfter / warnEveryOffense / severeEndsImmediately / steganography / webRtcCheck / 四条文案`（保存即生效，无需重启）。`blacklist / cnTimezones / 词表 / minSignals / showAttempts / promptEnforcement / ipCheck / blockOnUnknown` 需改 patch 后重启。
+设置页可改：`enabled / regionPolicy / regionTarget / abuseEnabled / warnThreshold / endThreshold / refusalEndsAfter / warnEveryOffense / severeEndsImmediately / steganography / webRtcCheck / llmMode / 四条文案`（保存即生效，无需重启）。`blacklist / cnTimezones / 词表 / minSignals / showAttempts / promptEnforcement / ipCheck / blockOnUnknown / abuse.llm.*` 需改 patch 后重启。
 
 ## 隐私
 
