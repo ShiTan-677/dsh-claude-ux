@@ -56,13 +56,21 @@ function makeHarness(config = {}) {
   let revision = 0;
   let replaceThrows = null;
   // fake llm 服务：llmState.calls 计数；llmState.text 为分类输出；llmState.fail 让流抛错
-  const llmState = { calls: 0, text: '{"abuse":false,"harmful":false,"selfHarm":false,"reason":"无"}', fail: false, lastOptions: null };
+  const llmState = { calls: 0, text: '{"abuse":false,"harmful":false,"selfHarm":false,"reason":"无"}', fail: false, lastOptions: null, blockEndOnly: false };
   const fakeLlm = {
     stream(options) {
       llmState.calls += 1;
       llmState.lastOptions = options;
       if (llmState.fail) {
         return (async function* () { throw new Error("llm down"); })();
+      }
+      if (llmState.blockEndOnly) {
+        // 个别适配器只给 block-end 全文、无 text-delta：兜底路径
+        return (async function* () {
+          yield { type: "block-start", index: 0, blockType: "text" };
+          yield { type: "block-end", index: 0, block: { type: "text", text: llmState.text } };
+          yield { type: "finish", reason: { kind: "stop" } };
+        })();
       }
       return (async function* () {
         yield { type: "block-start", index: 0, blockType: "text" };
@@ -312,6 +320,17 @@ const cannedText = (chunks) => chunks.find((c) => c.type === "text-delta")?.text
   check("classify uses session main model", h8.getLlmState().lastOptions?.provider === "opencode-go" && h8.getLlmState().lastOptions?.model === "fake-model", JSON.stringify({ provider: h8.getLlmState().lastOptions?.provider, model: h8.getLlmState().lastOptions?.model }));
   const c8 = await consume(h8.stream([m8]).result);
   check("inbox pre-classify: warn fires", cannedText(c8).includes("如果辱骂持续升级"));
+
+  // maxTokens 放大 + block-end-only 适配器兜底（无 text-delta 也能分类）
+  const hA = makeHarness();
+  hA.getLlmState().blockEndOnly = true;
+  hA.getLlmState().text = '{"abuse":true,"harmful":false,"selfHarm":false,"reason":"敌意嘲讽"}';
+  const mA = userMsg("你可真烦人");
+  await hA.preStep([mA], { kind: "enter", messages: [mA] });
+  check("block-end-only stream: LLM called once", hA.getLlmState().calls === 1, `calls=${hA.getLlmState().calls}`);
+  check("classify maxTokens raised (512)", hA.getLlmState().lastOptions?.maxTokens === 512, `maxTokens=${hA.getLlmState().lastOptions?.maxTokens}`);
+  const cA = await consume(hA.stream([mA]).result);
+  check("block-end-only: warn fires via block text", cannedText(cA).includes("如果辱骂持续升级"));
 
   // 模型输出带杂讯也能解析
   const h9 = makeHarness();
@@ -717,6 +736,18 @@ const cannedText = (chunks) => chunks.find((c) => c.type === "text-delta")?.text
   }), resCls2);
   const clsBody2 = JSON.parse(resCls2.out.body);
   check("classify action: LLM no overrides weak keyword", clsBody2.value.merged.abuse === false, resCls2.out.body);
+
+  // classify 自测：LLM 失败 → llmError 可见（诊断不再被吞）
+  h.getLlmState().fail = true;
+  const resCls3 = fakeRes();
+  await handler(fakeReq({
+    method: "POST",
+    headers: { origin: "http://127.0.0.1:3080", host: "127.0.0.1:3080" },
+    body: JSON.stringify({ action: "classify", text: "你真是个蠢货" }),
+  }), resCls3);
+  const clsBody3 = JSON.parse(resCls3.out.body);
+  check("classify action: LLM failure surfaces llmError", clsBody3.value.llm === null && typeof clsBody3.value.llmError === "string" && clsBody3.value.llmError.length > 0 && clsBody3.value.merged.abuse === true, resCls3.out.body);
+  h.getLlmState().fail = false;
 
   const h2 = makeHarness({ region: { minSignals: 100 } });
   const res2 = fakeRes();
