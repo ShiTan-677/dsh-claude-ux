@@ -332,6 +332,25 @@ const cannedText = (chunks) => chunks.find((c) => c.type === "text-delta")?.text
   const cA = await consume(hA.stream([mA]).result);
   check("block-end-only: warn fires via block text", cannedText(cA).includes("如果辱骂持续升级"));
 
+  // classify 请求消息必须用 DSH block 数组格式（字符串 content 会触发
+  // dsh-llm contentHasImage 的 "content.some is not a function" 报错）
+  check("classify messages use content blocks", Array.isArray(hA.getLlmState().lastOptions?.messages?.[1]?.content) && hA.getLlmState().lastOptions?.messages?.[1]?.content?.[0]?.type === "text" && hA.getLlmState().lastOptions?.messages?.[1]?.content?.[0]?.text === "你可真烦人", JSON.stringify(hA.getLlmState().lastOptions?.messages?.[1]).slice(0, 160));
+  check("classify system message uses content blocks", Array.isArray(hA.getLlmState().lastOptions?.messages?.[0]?.content) && hA.getLlmState().lastOptions?.messages?.[0]?.content?.[0]?.type === "text");
+
+  // 词表变体（用户实测踩坑的写法）：草你妈 / 你妈逼 → endThreshold=1 立即结束
+  const hV = makeHarness();
+  hV.settings.endThreshold = 1;
+  const mV = userMsg("草你妈");
+  await hV.preStep([mV], { kind: "enter", messages: [mV] });
+  const cV = await consume(hV.stream([mV]).result);
+  check("草你妈 variant: strong hit, no LLM, end fires", hV.getLlmState().calls === 0 && cannedText(cV).includes("现在结束这次对话"), `calls=${hV.getLlmState().calls} text=${cannedText(cV).slice(0, 40)}`);
+  const hV2 = makeHarness();
+  hV2.settings.endThreshold = 1;
+  const mV2 = userMsg("你妈逼的");
+  await hV2.preStep([mV2], { kind: "enter", messages: [mV2] });
+  const cV2 = await consume(hV2.stream([mV2]).result);
+  check("你妈逼 variant: end fires immediately", cannedText(cV2).includes("现在结束这次对话"), cannedText(cV2).slice(0, 40));
+
   // 模型输出带杂讯也能解析
   const h9 = makeHarness();
   h9.getLlmState().text = '好的，结果如下：\n{"abuse":true,"harmful":false,"selfHarm":false,"reason":"辱骂"}\n完毕';
